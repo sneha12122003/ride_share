@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("user") // "user", "admin"
+  userType      String    @default("rider") // "rider", "driver"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  offeredRides  Ride[]    @relation("DriverRides")
+  bookedRides   Booking[]
+  ratings       Rating[]  @relation("UserRatings")
+  givenRatings  Rating[]  @relation("RaterRatings")
+  messages      Message[]
+  badges        Badge[]
+  co2Saved      Float     @default(0)
+  streak        Int       @default(0)
+  lastRideDate  DateTime?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Ride {
+  id          String   @id @default(cuid())
+  driverId    String
+  source      String
+  destination String
+  date        DateTime
+  price       Float
+  seats       Int
+  bookedSeats Int      @default(0)
+  vehicleModel String
+  fuelType    String
+  notes       String?
+  status      String   @default("active") // "active", "completed", "cancelled"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driver      User      @relation("DriverRides", fields: [driverId], references: [id])
+  bookings    Booking[]
+  preferences RidePreference[]
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  rideId    String
+  userId    String
+  seats     Int      @default(1)
+  status    String   @default("pending") // "pending", "confirmed", "cancelled"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ride      Ride     @relation(fields: [rideId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Rating?
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  raterId   String
+  userId    String
+  rating    Int
+  review    String?
+  createdAt DateTime @default(now())
+
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  rater     User     @relation("RaterRatings", fields: [raterId], references: [id])
+  user      User     @relation("UserRatings", fields: [userId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  chatId    String
+
+  sender    User     @relation(fields: [senderId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id])
+}
+
+model Chat {
+  id        String    @id @default(cuid())
+  userIds   String[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  messages  Message[]
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String
+  earnedAt    DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model RidePreference {
+  id        String   @id @default(cuid())
+  rideId    String
+  name      String   // "AC", "Non-smoker", "Women-only", etc.
+  
+  ride      Ride     @relation(fields: [rideId], references: [id])
+
+  @@unique([rideId, name])
+}
+
+model EmergencyContact {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  phone     String
+  email     String?
+  relation  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, phone])
+}
